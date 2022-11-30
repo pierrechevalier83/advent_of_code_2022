@@ -1,0 +1,2 @@
+[alias]
+scaffold = "run --bin scaffold -- "
