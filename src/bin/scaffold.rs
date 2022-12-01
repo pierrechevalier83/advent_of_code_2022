@@ -36,8 +36,8 @@ mod tests {
     use super::*;
 
     const EXAMPLE_SOLUTION_PART1: Output = 0;
-    const EXAMPLE_SOLUTION_PART2: Output = 0;
     const SOLUTION_PART1: Output = 0;
+    const EXAMPLE_SOLUTION_PART2: Output = 0;
     const SOLUTION_PART2: Output = 0;
 
     fn input() -> Parsed {
@@ -46,7 +46,6 @@ mod tests {
     fn example_input() -> Parsed {
         parse_input(include_str!("../example/YEAR/dayDAY.txt"))
     }
-    use super::*;
     #[test]
     fn test_part1_given_example_input() {
         assert_eq!(part1(&example_input()), EXAMPLE_SOLUTION_PART1)
