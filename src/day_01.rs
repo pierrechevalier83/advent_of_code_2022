@@ -1,32 +1,48 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-type Parsed = ();
-type Input = ();
-type Output = u64;
+type Parsed = Vec<Vec<u32>>;
+type Input = [Vec<u32>];
+type Output = u32;
 
 #[aoc_generator(day1)]
 fn parse_input(data: &str) -> Parsed {
-    unimplemented!();
+    data.trim()
+        .split("\n\n")
+        .map(|elf| {
+            elf.split('\n')
+                .map(|cal| cal.parse().expect("failed to parse cal"))
+                .collect()
+        })
+        .collect()
 }
 
 #[aoc(day1, part1)]
 fn part1(data: &Input) -> Output {
-    unimplemented!();
+    data.iter()
+        .map(|elf| elf.iter().sum::<u32>())
+        .max()
+        .unwrap_or(0)
 }
 
 #[aoc(day1, part2)]
 fn part2(data: &Input) -> Output {
-    unimplemented!();
+    let mut top_elves = data
+        .iter()
+        .map(|elf| elf.iter().sum::<u32>())
+        .collect::<Vec<_>>();
+    top_elves.sort();
+
+    top_elves.iter().rev().take(3).sum::<u32>()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const EXAMPLE_SOLUTION_PART1: Output = 0;
-    const EXAMPLE_SOLUTION_PART2: Output = 0;
-    const SOLUTION_PART1: Output = 0;
-    const SOLUTION_PART2: Output = 0;
+    const EXAMPLE_SOLUTION_PART1: Output = 24000;
+    const EXAMPLE_SOLUTION_PART2: Output = 45000;
+    const SOLUTION_PART1: Output = 69626;
+    const SOLUTION_PART2: Output = 206780;
 
     fn input() -> Parsed {
         parse_input(include_str!("../input/2022/day1.txt"))
@@ -34,7 +50,6 @@ mod tests {
     fn example_input() -> Parsed {
         parse_input(include_str!("../example/2022/day1.txt"))
     }
-    use super::*;
     #[test]
     fn test_part1_given_example_input() {
         assert_eq!(part1(&example_input()), EXAMPLE_SOLUTION_PART1)
