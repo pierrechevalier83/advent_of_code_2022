@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Pierre Chevalier <pierrechevalier83@gmail.com>"]
 edition = "2021"
 license = "MIT"
+default-run = "advent_of_code_2022"
 
 [dependencies]
 aoc-runner = "0.3.0"
