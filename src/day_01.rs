@@ -1,27 +1,37 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
+use crate::input_parser::{parse_delimited_vec, parse_line_vec};
 use std::collections::BinaryHeap;
+use std::num::ParseIntError;
+use std::str::FromStr;
 
-type Parsed = Vec<Vec<u32>>;
-type Input = [Vec<u32>];
-type Output = u32;
+type Cal = u32;
+struct Elf {
+    cals: Vec<Cal>,
+}
+
+impl FromStr for Elf {
+    type Err = ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Elf {
+            cals: parse_line_vec(s)?,
+        })
+    }
+}
+
+type Parsed = Vec<Elf>;
+type Input = [Elf];
+type Output = Cal;
 
 #[aoc_generator(day1)]
 fn parse_input(data: &str) -> Parsed {
-    data.trim()
-        .split("\n\n")
-        .map(|elf| {
-            elf.split('\n')
-                .map(|cal| cal.parse().expect("failed to parse cal"))
-                .collect()
-        })
-        .collect()
+    parse_delimited_vec(data, "\n\n").expect("Failed to parse input")
 }
 
 #[aoc(day1, part1)]
 fn part1(data: &Input) -> Output {
     data.iter()
-        .map(|elf| elf.iter().sum::<u32>())
+        .map(|elf| elf.cals.iter().sum())
         .max()
         .unwrap_or(0)
 }
@@ -30,21 +40,21 @@ fn part1(data: &Input) -> Output {
 fn part2_naive(data: &Input) -> Output {
     let mut top_elves = data
         .iter()
-        .map(|elf| elf.iter().sum::<u32>())
+        .map(|elf| elf.cals.iter().sum())
         .collect::<Vec<_>>();
     top_elves.sort();
 
-    top_elves.iter().rev().take(3).sum::<u32>()
+    top_elves.iter().rev().take(3).sum()
 }
 
 #[aoc(day1, part2, Faster)]
 fn part2(data: &Input) -> Output {
     let top_elves = data
         .iter()
-        .map(|elf| elf.iter().sum::<u32>())
+        .map(|elf| elf.cals.iter().sum())
         .collect::<BinaryHeap<_>>();
 
-    top_elves.iter().take(3).sum::<u32>()
+    top_elves.iter().take(3).sum()
 }
 
 #[cfg(test)]

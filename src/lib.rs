@@ -25,5 +25,6 @@ pub mod day_01;
 //pub mod day_23;
 //pub mod day_24;
 //pub mod day_25;
+mod input_parser;
 
 aoc_lib! { year = 2022 }
