@@ -7,20 +7,22 @@ const DIR_SIZE_FILENAME: &str = "DIR_SIZE";
 const TOTAL_DISK_SPACE: usize = 70_000_000;
 const NEEDED_FREE_SPACE: usize = 30_000_000;
 
-fn get_path_size(path: VfsPath) -> usize {
+fn get_path_size(path: &VfsPath) -> usize {
     if path.is_file().unwrap() {
-        path
+        path.read_to_string()
     } else {
-        path.join(DIR_SIZE_FILENAME).unwrap()
+        path.join(DIR_SIZE_FILENAME).unwrap().read_to_string()
     }
-    .read_to_string()
     .unwrap()
     .parse::<usize>()
     .unwrap()
 }
 
 fn calculate_dir_size(path: &VfsPath) -> usize {
-    path.read_dir().unwrap().map(get_path_size).sum()
+    path.read_dir()
+        .unwrap()
+        .map(|path| get_path_size(&path))
+        .sum()
 }
 
 fn walk_dir_sizes(path: &VfsPath) -> impl Iterator<Item = usize> {
@@ -28,7 +30,7 @@ fn walk_dir_sizes(path: &VfsPath) -> impl Iterator<Item = usize> {
         .unwrap()
         .filter_map(|path| path.ok())
         .filter(|path| path.is_dir().unwrap())
-        .map(get_path_size)
+        .map(|path| get_path_size(&path))
 }
 
 struct Input {
@@ -72,6 +74,7 @@ impl FromStr for Input {
             .collect::<VfsResult<Vec<_>>>()?
             .iter()
             .rev()
+            .chain(std::iter::once(&root))
         {
             if path.is_dir().unwrap() {
                 let dir_size = calculate_dir_size(path);
@@ -103,7 +106,7 @@ fn part1(data: &Input) -> Output {
 
 #[aoc(day7, part2)]
 fn part2(data: &Input) -> Output {
-    let used_space: usize = calculate_dir_size(&data.root);
+    let used_space: usize = get_path_size(&data.root);
     let unused_space = TOTAL_DISK_SPACE - used_space;
     let extra_needed_space = NEEDED_FREE_SPACE - unused_space;
     walk_dir_sizes(&data.root)
