@@ -3,6 +3,7 @@ use aoc_runner_derive::{aoc, aoc_generator};
 use std::str::FromStr;
 use vfs::{MemoryFS, VfsError, VfsPath, VfsResult};
 
+const DIR_SIZE_FILENAME: &str = "DIR_SIZE";
 const TOTAL_DISK_SPACE: usize = 70_000_000;
 const NEEDED_FREE_SPACE: usize = 30_000_000;
 
@@ -10,12 +11,24 @@ fn get_path_size(path: VfsPath) -> usize {
     if path.is_file().unwrap() {
         path
     } else {
-        path.join("DIR_SIZE").unwrap()
+        path.join(DIR_SIZE_FILENAME).unwrap()
     }
     .read_to_string()
     .unwrap()
     .parse::<usize>()
     .unwrap()
+}
+
+fn calculate_dir_size(path: &VfsPath) -> usize {
+    path.read_dir().unwrap().map(get_path_size).sum()
+}
+
+fn walk_dir_sizes(path: &VfsPath) -> impl Iterator<Item = usize> {
+    path.walk_dir()
+        .unwrap()
+        .filter_map(|path| path.ok())
+        .filter(|path| path.is_dir().unwrap())
+        .map(get_path_size)
 }
 
 struct Input {
@@ -61,9 +74,9 @@ impl FromStr for Input {
             .rev()
         {
             if path.is_dir().unwrap() {
-                let dir_size: usize = path.read_dir().unwrap().map(get_path_size).sum();
+                let dir_size = calculate_dir_size(path);
                 write!(
-                    path.join("DIR_SIZE").unwrap().create_file().unwrap(),
+                    path.join(DIR_SIZE_FILENAME).unwrap().create_file().unwrap(),
                     "{dir_size}"
                 )
                 .unwrap();
@@ -83,27 +96,17 @@ fn parse_input(data: &str) -> Parsed {
 
 #[aoc(day7, part1)]
 fn part1(data: &Input) -> Output {
-    data.root
-        .walk_dir()
-        .unwrap()
-        .filter_map(|path| path.ok())
-        .filter(|path| path.is_dir().unwrap())
-        .map(get_path_size)
+    walk_dir_sizes(&data.root)
         .filter(|dir_size| *dir_size < 100_000)
         .sum()
 }
 
 #[aoc(day7, part2)]
 fn part2(data: &Input) -> Output {
-    let used_space: usize = data.root.read_dir().unwrap().map(get_path_size).sum();
-    let unused_space = dbg!(TOTAL_DISK_SPACE) - dbg!(used_space);
+    let used_space: usize = calculate_dir_size(&data.root);
+    let unused_space = TOTAL_DISK_SPACE - used_space;
     let extra_needed_space = NEEDED_FREE_SPACE - unused_space;
-    data.root
-        .walk_dir()
-        .unwrap()
-        .filter_map(|path| path.ok())
-        .filter(|path| path.is_dir().unwrap())
-        .map(get_path_size)
+    walk_dir_sizes(&data.root)
         .filter(|dir_size| *dir_size > extra_needed_space)
         .min()
         .unwrap()
