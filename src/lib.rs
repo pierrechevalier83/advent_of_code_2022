@@ -1,6 +1,7 @@
 #![feature(int_log)]
 #![feature(iter_array_chunks)]
 #![feature(associated_type_bounds)]
+#![feature(iter_intersperse)]
 
 use aoc_runner_derive::aoc_lib;
 
@@ -13,6 +14,7 @@ pub mod day_06;
 pub mod day_07;
 pub mod day_08;
 pub mod day_09;
+pub mod day_10;
 //pub mod day_11;
 //pub mod day_11;
 //pub mod day_12;
