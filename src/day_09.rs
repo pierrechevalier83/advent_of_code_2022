@@ -1,7 +1,7 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
 use crate::input_parser::parse_line_vec;
-use generic_array::{typenum::U1, typenum::U10, ArrayLength, GenericArray};
+use generic_array::{typenum::U1, typenum::U9, ArrayLength, GenericArray};
 use std::collections::BTreeSet;
 use std::collections::VecDeque;
 use std::str::FromStr;
@@ -17,10 +17,10 @@ struct RopeLink {
 impl RopeLink {
     fn move_head(&mut self, d: Direction) {
         let m = match d {
-            Direction::Up => (1, 0),
-            Direction::Down => (-1, 0),
-            Direction::Right => (0, 1),
-            Direction::Left => (0, -1),
+            Direction::Up => (0, 1),
+            Direction::Down => (0, -1),
+            Direction::Right => (1, 0),
+            Direction::Left => (-1, 0),
         };
         self.head.0 += m.0;
         self.head.1 += m.1;
@@ -32,41 +32,26 @@ impl RopeLink {
         );
         if distance.0 > 1 && self.head.1 == self.tail.1 {
             if self.head.0 > self.tail.0 {
-                assert!(self.tail.0 + 1 == self.head.0 - 1);
-                self.tail.0 = self.head.0 - 1;
+                self.tail.0 += 1;
             } else {
-                assert!(self.tail.0 - 1 == self.head.0 + 1);
-                self.tail.0 = self.head.0 + 1;
+                self.tail.0 -= 1;
             }
         } else if self.head.0 == self.tail.0 && distance.1 > 1 {
-            if self.head.1 > self.tail.1 {
-                assert!(self.tail.1 + 1 == self.head.1 - 1);
-                self.tail.1 = self.head.1 - 1;
-            } else {
-                assert!(self.tail.1 - 1 == self.head.1 + 1);
-                self.tail.1 = self.head.1 + 1;
-            }
-        } else if distance.0 > 1 {
-            if self.head.0 > self.tail.0 {
-                self.tail.0 += distance.0 - 1;
-            } else {
-                self.tail.0 -= distance.0 - 1;
-            }
             if self.head.1 > self.tail.1 {
                 self.tail.1 += 1;
             } else {
                 self.tail.1 -= 1;
             }
-        } else if distance.1 > 1 {
+        } else if distance.0 > 1 || distance.1 > 1 {
             if self.head.0 > self.tail.0 {
                 self.tail.0 += 1;
             } else {
                 self.tail.0 -= 1;
             }
             if self.head.1 > self.tail.1 {
-                self.tail.1 += distance.1 - 1;
+                self.tail.1 += 1;
             } else {
-                self.tail.1 -= distance.1 - 1;
+                self.tail.1 -= 1;
             }
         }
         let distance = (
@@ -75,7 +60,6 @@ impl RopeLink {
         );
         assert!(distance.0 <= 1);
         assert!(distance.1 <= 1);
-        println!("After move: Head: {:?}, Tail: {:?}", self.head, self.tail);
     }
 }
 
@@ -96,7 +80,6 @@ where
             self.links[i].head = self.links[i - 1].tail;
             self.links[i].move_tail();
         }
-        println!("===");
         self.links[self.links.len() - 1].tail
     }
 }
@@ -209,7 +192,7 @@ fn part1(data: &Input) -> Output {
 
 #[aoc(day9, part2)]
 fn part2(data: &Input) -> Output {
-    Simulation::<U10>::from_moves(data.clone())
+    Simulation::<U9>::from_moves(data.clone())
         .collect::<BTreeSet<_>>()
         .len()
 }
@@ -221,7 +204,7 @@ mod tests {
     const EXAMPLE_SOLUTION_PART1: Output = 13;
     const SOLUTION_PART1: Output = 6081;
     const EXAMPLE_SOLUTION_PART2: Output = 36;
-    const SOLUTION_PART2: Output = 0;
+    const SOLUTION_PART2: Output = 2487;
 
     fn input() -> Parsed {
         parse_input(include_str!("../input/2022/day9.txt"))
@@ -244,10 +227,8 @@ mod tests {
     fn test_part2_given_example_input() {
         assert_eq!(part2(&example_input_part2()), EXAMPLE_SOLUTION_PART2)
     }
-    /*
     #[test]
     fn test_part2() {
         assert_eq!(part2(&input()), SOLUTION_PART2)
     }
-    */
 }
