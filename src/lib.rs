@@ -3,6 +3,9 @@
 #![feature(associated_type_bounds)]
 #![feature(iter_intersperse)]
 
+#[macro_use]
+extern crate scan_rules;
+
 use aoc_runner_derive::aoc_lib;
 
 pub mod day_01;
@@ -15,7 +18,7 @@ pub mod day_07;
 pub mod day_08;
 pub mod day_09;
 pub mod day_10;
-//pub mod day_11;
+pub mod day_11;
 //pub mod day_11;
 //pub mod day_12;
 //pub mod day_13;
