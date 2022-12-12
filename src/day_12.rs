@@ -1,6 +1,6 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::iter::once;
 use std::str::FromStr;
 
@@ -46,13 +46,16 @@ impl Position {
             })
             .filter(move |pos| pos.row < num_rows && pos.col < num_cols)
     }
+    fn to_index(self, num_cols: u16) -> usize {
+        (self.row * num_cols + self.col) as usize
+    }
 }
 
 #[derive(Debug, Clone)]
 struct Input {
     num_cols: u16,
     num_rows: u16,
-    topology: HashMap<Position, Elevation>,
+    topology: Vec<Elevation>,
     start: Position,
     end: Position,
 }
@@ -70,13 +73,7 @@ impl FromStr for Input {
         let topology = s
             .chars()
             .filter(|c| *c != '\n')
-            .enumerate()
-            .map(|(i, c)| {
-                (
-                    Position::from_index_and_num_cols(i as u16, num_cols),
-                    Elevation::from(c),
-                )
-            })
+            .map(Elevation::from)
             .collect();
         let start = Position::from_index_and_num_cols(
             s.chars()
@@ -105,7 +102,7 @@ impl FromStr for Input {
 #[derive(Clone)]
 struct PathFinder {
     input: Input,
-    cost_to_dest: HashMap<Position, u64>,
+    cost_to_dest: Vec<Option<u64>>,
     boundary: VecDeque<Position>,
 }
 
@@ -114,11 +111,16 @@ impl PathFinder {
         let end = input.end;
         let boundary = end
             .neighbours(input.num_rows, input.num_cols)
-            .filter(|neighbour| input.topology[neighbour].0 + 1 >= input.topology[&end].0)
+            .filter(|neighbour| {
+                input.topology[neighbour.to_index(input.num_cols)].0 + 1
+                    >= input.topology[end.to_index(input.num_cols)].0
+            })
             .collect();
+        let mut cost_to_dest = vec![None; input.num_cols as usize * input.num_rows as usize];
+        cost_to_dest[end.to_index(input.num_cols)] = Some(0);
         Self {
             input,
-            cost_to_dest: once((end, 0)).collect(),
+            cost_to_dest,
             boundary,
         }
     }
@@ -127,15 +129,20 @@ impl PathFinder {
         pos: &'a Position,
     ) -> impl Iterator<Item = Position> + 'a {
         pos.neighbours(self.input.num_rows, self.input.num_cols)
-            .filter(|neighbour| !self.cost_to_dest.contains_key(neighbour))
+            .filter(|neighbour| {
+                self.cost_to_dest[neighbour.to_index(self.input.num_cols)].is_none()
+            })
     }
     fn explored_reachable_neighbours<'a>(
         &'a self,
         pos: &'a Position,
     ) -> impl Iterator<Item = Position> + 'a {
         pos.neighbours(self.input.num_rows, self.input.num_cols)
-            .filter(|p| self.cost_to_dest.contains_key(p))
-            .filter(|neighbour| self.input.topology[pos].0 + 1 >= self.input.topology[neighbour].0)
+            .filter(|p| self.cost_to_dest[p.to_index(self.input.num_cols)].is_some())
+            .filter(|neighbour| {
+                self.input.topology[pos.to_index(self.input.num_cols)].0 + 1
+                    >= self.input.topology[neighbour.to_index(self.input.num_cols)].0
+            })
     }
     fn precompute(&mut self) {
         while !self.boundary.is_empty() {
@@ -143,10 +150,12 @@ impl PathFinder {
             if let Some(pos) = self.boundary.pop_front() {
                 if let Some(cost) = self
                     .explored_reachable_neighbours(&pos)
-                    .map(|neighbour| self.cost_to_dest[&neighbour] + 1)
+                    .map(|neighbour| {
+                        self.cost_to_dest[neighbour.to_index(self.input.num_cols)].unwrap() + 1
+                    })
                     .min()
                 {
-                    self.cost_to_dest.insert(pos, cost);
+                    self.cost_to_dest[pos.to_index(self.input.num_cols)] = Some(cost); //.insert(pos, cost);
                     for neighbour in self.unexplored_neighbours(&pos).collect::<Vec<_>>() {
                         if !self.boundary.contains(&neighbour) {
                             self.boundary.push_back(neighbour);
@@ -158,15 +167,16 @@ impl PathFinder {
     }
     fn shortest_path(mut self, start: Position) -> Output {
         self.precompute();
-        self.cost_to_dest[&start]
+        self.cost_to_dest[start.to_index(self.input.num_cols)].unwrap()
     }
     fn shortest_path_from_any_a(mut self) -> Output {
         self.precompute();
         self.input
             .topology
             .iter()
+            .enumerate()
             .filter(|(_, elevation)| elevation.0 == 0)
-            .map(|(start, _)| self.cost_to_dest.get(start).copied().unwrap_or(u64::MAX))
+            .map(|(index, _)| self.cost_to_dest[index].unwrap_or(u64::MAX))
             .min()
             .unwrap()
     }
