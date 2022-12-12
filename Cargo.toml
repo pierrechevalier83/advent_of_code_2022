@@ -17,3 +17,6 @@ pico-args = "0.5.0"
 scan-rules = "0.2.0"
 sorted-vec = "0.7.0"
 vfs = "0.8.0"
+
+[profile.release]
+debug = true
