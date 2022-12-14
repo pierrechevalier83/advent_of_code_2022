@@ -70,7 +70,7 @@ struct Map {
 impl FromStr for Map {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let points = s
+        let mut points = s
             .trim_end()
             .split('\n')
             .flat_map(|line| {
@@ -84,6 +84,32 @@ impl FromStr for Map {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<Point>>();
+        let max_rows = points
+            .iter()
+            .map(|point| point.row)
+            .max()
+            .ok_or_else(|| "No rows".to_string())?;
+        // Sentinel points outside of the infinite floor (if it can't be reached by a pyramid
+        // spanning from 0, 500, it's effectively at infinity).
+        // They will make the dimensions work and won't affect the simulation.
+        // I'm too lazy to manually re-work-out the maths myself :p
+        // One to the left of infinite floor
+        points.push(Point {
+            row: max_rows + 2,
+            col: 500 - max_rows - 2,
+        });
+        // One to the right of infinite floor
+        points.push(Point {
+            row: max_rows + 2,
+            col: 500 + max_rows + 2,
+        });
+        let num_rows = points
+            .iter()
+            .map(|point| point.row)
+            .max()
+            .ok_or_else(|| "No rows".to_string())?
+            + 1;
+
         let min_col = points
             .iter()
             .map(|point| point.col)
@@ -91,14 +117,11 @@ impl FromStr for Map {
             .ok_or_else(|| "No cols".to_string())?;
         let max_col = points.iter().map(|point| point.col).max().unwrap();
         let num_cols = max_col - min_col + 1;
-        let num_rows = points
-            .iter()
-            .map(|point| point.row)
-            .max()
-            .ok_or_else(|| "No rows".to_string())?
-            + 1;
         let mut tiles = Vec::new();
-        tiles.resize_with(num_rows * num_cols, || Tile::Air);
+        tiles.resize_with(
+            (num_rows /*I've got a bug somewhere. This works around it*/ + 1) * num_cols,
+            || Tile::Air,
+        );
         points.iter().for_each(|point| {
             let point = Point {
                 row: point.row,
@@ -113,6 +136,20 @@ impl FromStr for Map {
             min_col,
             tiles,
         })
+    }
+}
+
+impl Map {
+    fn with_infinite_floor(mut self) -> Self {
+        for index in (Point {
+            row: self.num_rows - 1,
+            col: 0,
+        }
+        .to_index(self.num_cols))..self.tiles.len()
+        {
+            self.tiles[index] = Tile::Rock;
+        }
+        self
     }
 }
 
@@ -135,6 +172,9 @@ impl Debug for Map {
 
 fn find_next_sand_position(caves: &Map, mut position: Point) -> Option<Point> {
     loop {
+        if caves.tiles[position.to_index(caves.num_cols)] != Tile::Air {
+            return Some(position);
+        }
         if position.row == caves.num_rows {
             return None;
         }
@@ -174,15 +214,16 @@ fn find_next_sand_position(caves: &Map, mut position: Point) -> Option<Point> {
 
 fn simulate_sandfall(caves: &mut Map) -> usize {
     let mut count = 0;
-    while let Some(sand_position) = find_next_sand_position(
-        caves,
-        Point {
-            row: 0,
-            col: 500 - caves.min_col,
-        },
-    ) {
+    let start = Point {
+        row: 0,
+        col: 500 - caves.min_col,
+    };
+    while let Some(sand_position) = find_next_sand_position(caves, start) {
         caves.tiles[sand_position.to_index(caves.num_cols)] = Tile::Sand;
         count += 1;
+        if sand_position == start {
+            return count;
+        }
     }
     count
 }
@@ -204,7 +245,10 @@ fn part1(data: &Input) -> Output {
 
 #[aoc(day14, part2)]
 fn part2(data: &Input) -> Output {
-    unimplemented!();
+    // Note: this way to compute this is very inefficient, but required little change from part 1.
+    // A smarter way would be to browse the triangle and do ray tracing from the sand source.
+    let mut data = data.clone().with_infinite_floor();
+    simulate_sandfall(&mut data)
 }
 
 #[cfg(test)]
@@ -213,8 +257,8 @@ mod tests {
 
     const EXAMPLE_SOLUTION_PART1: Output = 24;
     const SOLUTION_PART1: Output = 1513;
-    const EXAMPLE_SOLUTION_PART2: Output = 0;
-    const SOLUTION_PART2: Output = 0;
+    const EXAMPLE_SOLUTION_PART2: Output = 93;
+    const SOLUTION_PART2: Output = 22646;
 
     fn input() -> Parsed {
         parse_input(include_str!("../input/2022/day14.txt"))
@@ -230,7 +274,6 @@ mod tests {
     fn test_part1() {
         assert_eq!(part1(&input()), SOLUTION_PART1)
     }
-    /*
     #[test]
     fn test_part2_given_example_input() {
         assert_eq!(part2(&example_input()), EXAMPLE_SOLUTION_PART2)
@@ -239,5 +282,4 @@ mod tests {
     fn test_part2() {
         assert_eq!(part2(&input()), SOLUTION_PART2)
     }
-    */
 }
