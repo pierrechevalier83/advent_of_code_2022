@@ -19,6 +19,7 @@ serde = "1.0.101"
 serde_derive = "1.0.101"
 serde_json = "1.0.41"
 sorted-vec = "0.7.0"
+text_io = "0.1.12"
 vfs = "0.8.0"
 
 [profile.release]
