@@ -1,11 +1,11 @@
 use aoc_runner_derive::{aoc, aoc_generator};
 
 use scan_rules::scan;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::ops::RangeInclusive;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone, Copy)]
 struct Pos {
     x: i64,
     y: i64,
@@ -144,6 +144,13 @@ fn part1(data: &Input, line: i64) -> Output {
             .len() as i64
 }
 
+// A range that we guarantee we'll only compare with non overlapping ranges, so we can order it
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug)]
+struct OrdRange {
+    start: i64,
+    end: i64,
+}
+
 #[aoc(day15, part1, Example)]
 fn part1_example(data: &Input) -> Output {
     part1(data, 10)
@@ -154,9 +161,57 @@ fn part1_big(data: &Input) -> Output {
     part1(data, 2_000_000)
 }
 
-#[aoc(day15, part2)]
-fn part2(data: &Input) -> Output {
-    unimplemented!();
+fn tuning_frequency(pos: Pos) -> i64 {
+    4_000_000 * pos.x + pos.y
+}
+
+fn part2(data: &Input, max_line: i64) -> Output {
+    let busy_positions = data
+        .sensors
+        .iter()
+        .flat_map(|sensor| vec![sensor.pos, sensor.closest_beacon])
+        .collect::<HashSet<_>>();
+    for line in 0..=max_line {
+        let mut covered_range = CoveredRange::default();
+        for range in data.sensors.iter().filter_map(|sensor| {
+            if sensor.is_in_range(line) {
+                Some(sensor.exclusion_range_at_line(line))
+            } else {
+                None
+            }
+        }) {
+            covered_range.insert(range);
+        }
+        let mut ranges = covered_range
+            .ranges
+            .iter()
+            .map(|range| OrdRange {
+                start: *range.start(),
+                end: *range.end(),
+            })
+            .collect::<Vec<_>>();
+        ranges.sort();
+        for window in ranges.windows(2) {
+            if window[0].end + 1 < window[1].start {
+                let x = window[0].end + 1;
+                let candidate = Pos { x, y: line };
+                if !busy_positions.contains(&candidate) {
+                    return tuning_frequency(Pos { x, y: line });
+                }
+            }
+        }
+    }
+    0
+}
+
+#[aoc(day15, part2, Example)]
+fn part2_example(data: &Input) -> Output {
+    part2(data, 20)
+}
+
+#[aoc(day15, part2, Big)]
+fn part2_big(data: &Input) -> Output {
+    part2(data, 4_000_000)
 }
 
 #[cfg(test)]
@@ -165,8 +220,8 @@ mod tests {
 
     const EXAMPLE_SOLUTION_PART1: Output = 26;
     const SOLUTION_PART1: Output = 4985193;
-    const EXAMPLE_SOLUTION_PART2: Output = 0;
-    const SOLUTION_PART2: Output = 0;
+    const EXAMPLE_SOLUTION_PART2: Output = 56000011;
+    const SOLUTION_PART2: Output = 11583882601918;
 
     fn input() -> Parsed {
         parse_input(include_str!("../input/2022/day15.txt"))
@@ -184,10 +239,10 @@ mod tests {
     }
     #[test]
     fn test_part2_given_example_input() {
-        assert_eq!(part2(&example_input()), EXAMPLE_SOLUTION_PART2)
+        assert_eq!(part2_example(&example_input()), EXAMPLE_SOLUTION_PART2)
     }
     #[test]
     fn test_part2() {
-        assert_eq!(part2(&input()), SOLUTION_PART2)
+        assert_eq!(part2_big(&input()), SOLUTION_PART2)
     }
 }
