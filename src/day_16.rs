@@ -2,13 +2,14 @@ use aoc_runner_derive::{aoc, aoc_generator};
 
 use crate::input_parser::parse_delimited_vec;
 
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::str::FromStr;
 
 const LABEL_SPACE: usize = 26 * 26;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 struct Label(u16);
 
 impl FromStr for Label {
@@ -201,148 +202,87 @@ fn precompute_all_shortest_paths(data: &CavesNetwork) -> LabelMap<LabelMap<Optio
     shortest_paths
 }
 
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+struct MemoKey {
+    time: u64,
+    cave: Label,
+}
+
 const MAX_TIME: u64 = 30;
-// TODO: this + memoization should work
-fn expected_value_at_time(time: u64, cave: Label, caves: &CavesNetwork) -> (u64, Vec<Label>) {
-    if time >= MAX_TIME {
-        return (0, Vec::new());
-    }
-    let remaining_time = if time == MAX_TIME {
-        0
-    } else {
-        MAX_TIME - time - 1
-    };
-    // Open this valve and move on
-    let max_neighbour_value_in_two_minutes = caves
-        .tunnels
-        .get(cave)
-        .iter()
-        .map(|neighbour| expected_value_at_time(time + 2, *neighbour, caves))
-        // Filter out paths that have already opened our valve as in that case, it would be a
-        // waste of time to open it again.
-        .filter(|neighbour| !neighbour.1.contains(&cave))
-        .max_by(|l, r| l.0.cmp(&r.0))
-        .unwrap_or((0, Vec::new()));
-    let value_if_open_valve =
-        *caves.flow_rates.get(cave) as u64 * remaining_time + max_neighbour_value_in_two_minutes.0;
-    let max_neighbour_value_in_one_minute = caves
-        .tunnels
-        .get(cave)
-        .iter()
-        .map(|neighbour| expected_value_at_time(time + 1, *neighbour, caves))
-        .max_by(|l, r| l.0.cmp(&r.0))
-        .unwrap_or((0, Vec::new()));
-    let value_if_skip_valve = max_neighbour_value_in_one_minute.0;
-    if value_if_open_valve > value_if_skip_valve {
-        let mut path = max_neighbour_value_in_two_minutes.1;
-        path.push(cave);
-        (value_if_open_valve, path)
-    } else {
-        max_neighbour_value_in_one_minute
-    }
-}
 
-fn expected_values_at_time(time: u64, caves: &CavesNetwork) -> LabelMap<(u64, Vec<Label>)> {
-    println!("At time: {time}");
-    let mut expected_values: LabelMap<(u64, Vec<Label>)> = Default::default();
-    for label in caves.caves.labels() {
-        let (value, path) = expected_value_at_time(time, label, caves);
-        println!("({label:?} -> {value:?}: {path:?})");
-        expected_values.set(label, (value, path));
-    }
-    expected_values
-}
-/*
- * This approach is suboptimal : If we pick the best value later in time, we don't maximize value overall
-
+// Note: expected DD, BB, JJ, HH, EE, CC
+// TODO: Debug. This doesn't behave as expected: wrong path
 fn expected_value_at_time(
     time: u64,
     cave: Label,
     caves: &CavesNetwork,
-    expected_values_in_one_minute: &LabelMap<(u64, Vec<Label>)>,
-    expected_values_in_two_minutes: &LabelMap<(u64, Vec<Label>)>,
+    memo: &mut HashMap<MemoKey, (u64, Vec<Label>)>,
 ) -> (u64, Vec<Label>) {
+    if let Some(already_seen) = memo.get(&MemoKey { time, cave }) {
+        return already_seen.clone();
+    }
+    if time >= MAX_TIME {
+        return (0, Vec::new());
+    }
+    // TODO: double check this calculation with some examples
     let remaining_time = if time == MAX_TIME {
         0
     } else {
         MAX_TIME - time - 1
     };
-    // Open this valve and move on
-    let max_neighbour_value_in_two_minutes = caves
+
+    caves
         .tunnels
         .get(cave)
         .iter()
-        .map(|neighbour| expected_values_in_two_minutes.get(*neighbour))
-        // Filter out paths that have already opened our valve as in that case, it would be a
-        // waste of time to open it again.
-        .filter(|neighbour| !neighbour.1.contains(&cave))
+        .map(|neighbour| {
+            // TODO: instead of only giving me the max, they should give me the max including my
+            // cave and the max excluding my cave so I can take the best decision
+            // As it is, we are pruning out potentially more optimal paths
+            let value_if_closed_valve = expected_value_at_time(time + 1, *neighbour, caves, memo);
+            let their_value_if_open_valve =
+                expected_value_at_time(time + 2, *neighbour, caves, memo);
+            if their_value_if_open_valve.1.contains(&cave) {
+                value_if_closed_valve
+            } else {
+                let my_value_if_open_valve = remaining_time * *caves.flow_rates.get(cave) as u64;
+                let total_value = my_value_if_open_valve + their_value_if_open_valve.0;
+                if total_value > value_if_closed_valve.0 {
+                    let mut my_path = their_value_if_open_valve.1;
+                    my_path.push(cave);
+                    memo.insert(MemoKey { time, cave }, (total_value, my_path.clone()));
+                    (total_value, my_path)
+                } else {
+                    memo.insert(MemoKey { time, cave }, value_if_closed_valve.clone());
+                    value_if_closed_valve
+                }
+            }
+        })
         .max_by(|l, r| l.0.cmp(&r.0))
-        .cloned()
-        .unwrap_or((0, Vec::new()));
-    let value_if_open_valve =
-        *caves.flow_rates.get(cave) as u64 * remaining_time + max_neighbour_value_in_two_minutes.0;
-    let max_neighbour_value_in_one_minute = caves
-        .tunnels
-        .get(cave)
-        .iter()
-        .map(|neighbour| expected_values_in_one_minute.get(*neighbour))
-        .max_by(|l, r| l.0.cmp(&r.0))
-        .cloned()
-        .unwrap_or((0, Vec::new()));
-    let value_if_skip_valve = max_neighbour_value_in_one_minute.0;
-    if value_if_open_valve > value_if_skip_valve {
-        let mut path = max_neighbour_value_in_two_minutes.1;
-        path.push(cave);
-        (value_if_open_valve, path)
-    } else {
-        max_neighbour_value_in_one_minute
-    }
+        .unwrap_or((0, Vec::new()))
 }
 
 fn expected_values_at_time(
     time: u64,
     caves: &CavesNetwork,
-    expected_values_in_one_minute: &LabelMap<(u64, Vec<Label>)>,
-    expected_values_in_two_minutes: &LabelMap<(u64, Vec<Label>)>,
+    memo: &mut HashMap<MemoKey, (u64, Vec<Label>)>,
 ) -> LabelMap<(u64, Vec<Label>)> {
     println!("At time: {time}");
     let mut expected_values: LabelMap<(u64, Vec<Label>)> = Default::default();
     for label in caves.caves.labels() {
-        let (value, path) = expected_value_at_time(
-            time,
-            label,
-            caves,
-            expected_values_in_one_minute,
-            expected_values_in_two_minutes,
-        );
+        let (value, path) = expected_value_at_time(time, label, caves, memo);
         println!("({label:?} -> {value:?}: {path:?})");
         expected_values.set(label, (value, path));
     }
     expected_values
 }
-*/
+
 #[aoc(day16, part1)]
 fn part1(data: &Input) -> Output {
-    //let mut expected_values_in_one_minute = LabelMap::<(u64, Vec<Label>)>::default();
-    //let mut expected_values_in_two_minutes = LabelMap::<(u64, Vec<Label>)>::default();
-    let mut expected_values = LabelMap::<(u64, Vec<Label>)>::default();
-    for time in 1..=30 {
-        expected_values = expected_values_at_time(time, data)
-    }
-    /*
-    // Backtrack (incorrect)
-    for time in (1..=30).rev() {
-        expected_values = expected_values_at_time(
-            time,
-            data,
-            &expected_values_in_one_minute,
-            &expected_values_in_two_minutes,
-        );
-        expected_values_in_two_minutes = expected_values_in_one_minute;
-        expected_values_in_one_minute = expected_values.clone();
-    }
-    */
-    expected_values.get(Label::from_str("AA").unwrap()).0
+    let mut memo = HashMap::new();
+    expected_values_at_time(1, data, &mut memo)
+        .get(Label::from_str("AA").unwrap())
+        .0
 }
 
 #[aoc(day16, part2)]
